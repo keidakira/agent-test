@@ -1,0 +1,22 @@
+version: 1
+runtime: python3.12
+
+# mode: function  -> platform generates the HTTP layer, you write plain functions
+# mode: service   -> you wrote the server, platform only labels your routes
+mode: function
+
+agents:
+  - name: research
+    entrypoint: agents.research:run
+    # Only these keys are forwarded from the request body. Anything else is
+    # rejected with 422. Without this, every keyword arg with a default
+    # becomes a public API.
+    input: [query]
+
+  - name: billing
+    entrypoint: agents.billing:run
+    input: [account_id]
+
+  - name: support
+    entrypoint: agents.support:run
+    input: [message, session_id]
