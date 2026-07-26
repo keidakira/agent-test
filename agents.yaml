@@ -5,6 +5,16 @@ runtime: python3.12
 # mode: service   -> you wrote the server, platform only labels your routes
 mode: function
 
+# Read by agents/_client.py. Locally these come from .env; in deployment the
+# platform injects them. OPENAI_API_KEY is a secret and is never echoed back
+# in a response.
+secrets:
+  - OPENAI_API_KEY
+
+env:
+  OPENAI_MODEL: gpt-4.1-mini
+  REGION: unset
+
 agents:
   - name: research
     entrypoint: agents.research:run
@@ -12,11 +22,18 @@ agents:
     # rejected with 422. Without this, every keyword arg with a default
     # becomes a public API.
     input: [query]
+    # Web search plus a model turn; the ceiling has to clear a slow search.
+    timeout: 120
 
   - name: billing
     entrypoint: agents.billing:run
     input: [account_id]
+    # Tool-calling loop: up to 4 model turns against the ledger.
+    timeout: 90
 
   - name: support
     entrypoint: agents.support:run
     input: [message, session_id]
+    # Single model turn. Session continuity is held per-worker in memory, so
+    # route a session_id to a sticky worker or the transcript restarts.
+    timeout: 60
