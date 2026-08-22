@@ -1,0 +1,9 @@
+runtime: python
+
+entrypoint:
+  file: agent.py
+  class: MarketingAgent
+  method: run
+
+server:
+  port: 8080

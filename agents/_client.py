@@ -3,6 +3,8 @@
 The local package is named `agents`, which shadows the OpenAI Agents SDK's
 top-level `agents` module. We talk to the `openai` SDK directly instead.
 """
+from __future__ import annotations
+
 import json
 import os
 from functools import lru_cache
@@ -60,10 +62,44 @@ def json_schema(name: str, properties: dict, required: list[str]) -> dict:
 
 def parse_output(response: Any) -> dict:
     """Structured output comes back as a JSON string on `output_text`."""
-    text = (response.output_text or "").strip()
+    text = (getattr(response, "output_text", None) or "").strip()
+    if not text and hasattr(response, "output"):
+        for item in getattr(response, "output", []):
+            if getattr(item, "type", None) == "message":
+                for content_part in getattr(item, "content", []):
+                    if getattr(content_part, "type", None) in ("text", "output_text"):
+                        text = (getattr(content_part, "text", "") or "").strip()
+                        if text:
+                            break
     if not text:
         raise RuntimeError("Model returned an empty response.")
-    return json.loads(text)
+
+    # Strip markdown code blocks if wrapped
+    if text.startswith("```json"):
+        text = text[7:]
+    elif text.startswith("```"):
+        text = text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    text = text.strip()
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            try:
+                return json.loads(text[start : end + 1])
+            except json.JSONDecodeError:
+                pass
+        try:
+            start_idx = text.find("{") if "{" in text else 0
+            obj, _ = json.JSONDecoder().raw_decode(text[start_idx:])
+            return obj
+        except Exception as e:
+            raise RuntimeError(f"Failed to parse model JSON output: {e}\nRaw output: {text}") from e
+
 
 
 def run_tool_calls(response: Any, handlers: dict[str, Callable[..., Any]]) -> list[dict]:
