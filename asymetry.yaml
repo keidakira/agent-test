@@ -12,7 +12,3 @@ runtime:
   entrypoint: agents:run
   port: 8080
   health: /health
-env:
-  - {key: OPENAI_API_KEY}
-  - {key: OPENAI_MODEL, value: gpt-4.1-mini}
-  - {key: REGION, value: local}
